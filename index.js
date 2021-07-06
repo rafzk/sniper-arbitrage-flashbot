@@ -1,6 +1,5 @@
 require('dotenv').config()
 const Web3 = require("web3")
-const HDWalletProvider = require("@truffle/hdwallet-provider");
 const WETH9 = require('./abi/WETH9.json')
 const UniswapV3RouterAbi = require("./abi/UniswapV3Router.json")
 const UniswapV3FactoryAbi = require("./abi/UniswapV3Factory.json")
@@ -62,7 +61,6 @@ factory.events.PoolCreated({
       sqrtPriceLimitX96: 0,
     }
 
-    const approval = await weth9.appove
     const swap = await router.methods.exactInputSingle(params)
     let encodedSwap = swap.encodeABI()
     let tx = {
