@@ -1,4 +1,4 @@
-# The Sniper Arbitrage Floan Loan Flashbot
+# The Sniper Arbitrage Flash Loan Flashbot
 
 current version 0.02
 
