@@ -1,0 +1,22 @@
+version: '3.7'
+services:
+  mongo:
+    image: mongo:latest
+    environment:
+      - MONGO_INITDB_DATABASE=flashbot
+      - MONGO_INITDB_ROOT_USERNAME:${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD:${MONGO_INITDB_ROOT_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - "mongo:/data/db"
+
+  engine:
+    build: .
+    volumes:
+      - "./:/usr/src/app"
+
+volumes:
+  mongo:
+
+
