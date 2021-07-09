@@ -10,6 +10,7 @@ Fill it out
 
 - [Jamesbachini](https://github.com/jamesbachini/Uniswap-V3-Experiments/blob/main/uniswap-v3-trader.js)
 - [jklepatch](https://github.com/jklepatch/eattheblocks/blob/master/screencast/322-uniswap-trading-bot/bot.js)
+- [6eer](https://github.com/6eer/uniswap-sushiswap-arbitrage-bot)
 
 ## Basic Plan
 Snipe altcoins on uniswap and sushiswap

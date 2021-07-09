@@ -1,8 +1,9 @@
 require('dotenv').config()
+
 const mongoose = require('mongoose')
 mongoose.connect('mongodb://mongo:27017/flashbot')
 
-const Token = mongoose.model('Token', {
+const TokenModel = mongoose.model('Token', {
   network: String,
   name: String,
   address: String,
@@ -19,6 +20,8 @@ const UniswapV3RouterAbi = require("./abi/UniswapV3Router.json")
 const SushiswapV2Router02Abi = require('./abi/SushiswapV2Router02.json')
 const UniswapV3FactoryAbi = require("./abi/UniswapV3Factory.json")
 const SushiswapV2FactoryAbi = require('./abi/SushiswapV2Factory.json')
+const UniswapV3PoolAbi = require("./abi/UniswapV3Pool.json")
+const SushiswapV2PairAbi = require('./abi/IUniswapV2Pair.json')
 
 // ropsten specific
 const addresses = {
@@ -108,7 +111,7 @@ uniFactory.events.PoolCreated({
       } else {
         web3.eth.sendSignedTransaction(stx.rawTransaction).on('receipt', async (receipt) => {
           console.log(receipt.logs)
-          const record = await Token.findOneAndUpdate(
+          const record = await TokenModel.findOneAndUpdate(
             {address: tokenOut},
             {
               uniPoolAddr: pool,
@@ -116,7 +119,7 @@ uniFactory.events.PoolCreated({
             }  
           )
           if (!record) {
-            const newRecord = new Token({
+            const newRecord = new TokenModel({
               network: 'Ropsten',
               name: 'Token',
               address: tokenOut ,
@@ -183,7 +186,7 @@ sushiFactory.events.PairCreated({
       } else {
         web3.eth.sendSignedTransaction(stx.rawTransaction).on('receipt', async (receipt) => {
           console.log(receipt.logs)
-          const record = await Token.findOneAndUpdate(
+          const record = await TokenModel.findOneAndUpdate(
             {address: tokenOut},
             {
               sushiPoolAddr: pair,
@@ -191,7 +194,7 @@ sushiFactory.events.PairCreated({
             }
           )
           if (!record) {
-            const newRecord = new Token({
+            const newRecord = new TokenModel({
               network: 'Ropsten',
               name: 'Token',
               address: tokenOut,
@@ -206,4 +209,104 @@ sushiFactory.events.PairCreated({
       }
     })
   })
-  .on('error', console.error)
+  .on('error', console.error);
+
+  web3.eth.subscribe("newBlockHeaders")
+  .on("connected", () => console.log('listening to blocks'))
+  .on("data", async (blockHeader) => {
+    const tokens = await TokenModel.find({
+      uniPoolAddr: {$exists: true},
+      sushiPoolAddr: {$exists: true}
+    });
+    tokens.forEach(async (token) => {
+      const uniPool = new web3.eth.Contract(
+        UniswapV3PoolAbi,
+        token.uniPoolAddr
+      )
+      const uniToken0 = await uniPool.methods.token0().call()
+      const uniToken1 = await uniPool.methods.token1().call()
+      const slot0 = await uniPool.methods.slot0().call()
+      let uniPrice = ((slot0.sqrtPriceX96*slot0.sqrtPriceX96)) / (2**(2*96))
+      if (uniToken0  == addresses.WETH) {
+        uniPrice = 1/uniPrice
+      }
+      console.log('uniprice', uniPrice)
+
+      const pairAddress = await sushiFactory.methods.getPair(addresses.WETH, token.address).call()
+      console.log(pairAddress)
+      const sushiPair = new web3.eth.Contract(
+        SushiswapV2PairAbi,
+        pairAddress
+      )
+      const sushiToken0 = await sushiPair.methods.token0().call()
+      const sushiToken1 = await sushiPair.methods.token1().call()
+      const reserves = await sushiPair.methods.getReserves().call()
+      let sushiPrice;
+      if (sushiToken0 == addresses.WETH) {
+        sushiPrice = reserves[0]/reserves[1]
+      }
+      if (sushiToken1 == addresses.WETH) {
+        sushiPrice = reserves[1]/reserves[0]
+      }
+      console.log('sushi sushiPrice', sushiPrice)
+    })
+
+  })
+  .on("error", console.error);
+  
+
+
+(async () => {
+  const tokens = await TokenModel.find({
+    uniPoolAddr: {$exists: true},
+    sushiPoolAddr: {$exists: true}
+  });
+  const uniPool = new web3.eth.Contract(
+    UniswapV3PoolAbi,
+    tokens[0].uniPoolAddr
+  )
+  const token0 = await uniPool.methods.token0().call()
+  const token1 = await uniPool.methods.token1().call()
+  const slot0 = await uniPool.methods.slot0().call()
+  let price = ((slot0.sqrtPriceX96*slot0.sqrtPriceX96)) / (2**(2*96))
+  if (token0 == addresses.WETH) {
+    price = 1/price
+  }
+  console.log('uniprice', price)
+  
+})();
+
+
+
+
+
+(async () => {
+  const tokens = await TokenModel.find({
+    uniPoolAddr: {$exists: true},
+    sushiPoolAddr: {$exists: true}
+  });
+
+  console.log(tokens[0])
+  const pairAddress = await sushiFactory.methods.getPair(addresses.WETH, tokens[0].address).call()
+  console.log(pairAddress)
+  const sushiPair = new web3.eth.Contract(
+    SushiswapV2PairAbi,
+    pairAddress
+  )
+  const token0 = await sushiPair.methods.token0().call()
+  console.log(token0)
+  const token1 = await sushiPair.methods.token1().call()
+  console.log(token1)
+  const reserves = await sushiPair.methods.getReserves().call()
+  let price;
+  if (token0 == addresses.WETH) {
+    price = reserves[0]/reserves[1]
+  }
+  if (token1 == addresses.WETH) {
+    price = reserves[1]/reserves[0]
+  }
+  console.log('sushi price', price)
+  
+
+  //const quote = await sushiRouter.methods.quote().call()
+})();
