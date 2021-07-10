@@ -255,7 +255,7 @@ sushiFactory.events.PairCreated({
   .on("error", console.error);
   
 
-
+/*
 (async () => {
   const tokens = await TokenModel.find({
     uniPoolAddr: {$exists: true},
@@ -310,3 +310,4 @@ sushiFactory.events.PairCreated({
 
   //const quote = await sushiRouter.methods.quote().call()
 })();
+*/
