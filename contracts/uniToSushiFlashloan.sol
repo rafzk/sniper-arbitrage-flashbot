@@ -10,6 +10,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 
 contract uniToSushiFlashloan is FlashLoanReceiverBase {
   ISwapRouter immutable uniRouter;
+  address WETH9 = 0xc778417E063141139Fce010982780140Aa0cD5Ab;
   IUniswapV2Router02 immutable sushiRouter;
   constructor(address _addressProvider) FlashLoanReceiverBase(_addressProvider)  {
     uniRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
@@ -21,17 +22,44 @@ contract uniToSushiFlashloan is FlashLoanReceiverBase {
     This function is called after your contract has received the flash loaned amount
    */
   function executeOperation(
-		address[] calldata assets,
-		uint256[] calldata amounts,
-		uint256[] calldata premiums,
-		address initiator,
-		bytes calldata params
+    address _reserve,
+    uint256 _amount,
+    uint256 _fee,
+    bytes calldata _params  
   )
   external
   override
   returns (bool)  
   {
-    //require(_amount <= getBalanceInternal(address(this), _reserve), "Invalid balance, was the flashLoan successful?");
+    require(_amount <= getBalanceInternal(address(this), _reserve), "Invalid balance, was the flashLoan successful?");
+    (
+      address token0,
+      address token1,
+      uint24 fee
+    ) = abi.decode(_params, (address, address, uint24)); 
+    
+    ISwapRouter.ExactInputSingleParams memory uniV3Params = 
+      ISwapRouter.ExactInputSingleParams(
+      WETH9,
+      token0,
+      fee,
+      address(this),
+      block.timestamp + 900,
+      _amount,
+      0,
+      0
+    );
+    uint256 token = uniRouter.exactInputSingle(uniV3Params);
+    address[] memory path = new address[](2);
+    path[0] = token1;
+    path[1] = WETH9;
+    uint256[] memory amounts = sushiRouter.swapExactTokensForTokens(
+      token,
+      0,
+      path,
+      address(this),
+      block.timestamp + 900
+    );
 
     //
     // Your logic goes here.
@@ -39,42 +67,28 @@ contract uniToSushiFlashloan is FlashLoanReceiverBase {
     //
 
 
-
-    //uint totalDebt = _amount + _fee;
-    //transferFundsBackToPoolInternal(_reserve, totalDebt);
+    uint totalDebt = _amount + _fee;
+    transferFundsBackToPoolInternal(_reserve, totalDebt);
   }
 
   /**
-    Flash loan 1000000000000000000 wei (1 ether) worth of `_asset`
-   */
+  Flash loan 1000000000000000000 wei (1 ether) worth of `_asset`
+  */
   function flashloan(
-    address token0Addr,
-    address token1Addr,
-    uint256 token0Amount,
-    uint256 token1Amount
+    uint256 ethAmount,
+    bytes calldata _params
   ) public onlyOwner {
-    address receiverAddress = 0x3bE057bBAF734770c8a4CA81e2Abbdc29deb39F0;
-    address[] memory assets = new address[](2); 
-    assets[0] = token0Addr;
-    assets[1] = token1Addr;
-    uint256[] memory amounts = new uint256[](2);
-    amounts[0] = token0Amount;
-    amounts[1] = token1Amount;
-    uint256[] memory modes = new uint256[](2);
-    modes[0] = 0;
-    modes[1] = 0;
-    address onBehalfOf = 0x3bE057bBAF734770c8a4CA81e2Abbdc29deb39F0;
-    bytes memory data = "";
-    uint16 referralCode = 0;
+   /* params 
+    address token0
+    address token1
+   */
     ILendingPool lendingPool = ILendingPool(addressesProvider.getLendingPool());
     lendingPool.flashLoan(
-      receiverAddress, //should this be address(this)?
-      assets,
-      amounts,
-      modes,
-			onBehalfOf,
-      data,
-			referralCode
+      address(this), //should this be address(this)?
+      WETH9,
+      ethAmount,
+      _params
+      
     );
   }
 }
